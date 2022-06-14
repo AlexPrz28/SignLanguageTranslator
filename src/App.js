@@ -1,32 +1,32 @@
-import React, { useRef, useState, useEffect } from "react";
-import * as tf from "@tensorflow/tfjs";
-import Webcam from "react-webcam";
-import "./App.css";
-import { nextFrame } from "@tensorflow/tfjs";
-import { drawRect } from "./utilities";
+import React, { useRef, useState, useEffect } from 'react';
+import * as tf from '@tensorflow/tfjs';
+import Webcam from 'react-webcam';
+import './App.css';
+import { drawRect, getTranslationText } from './utilities';
 
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  const [detectedWord, setDetectedWord] = useState('');
 
   // Main function
   const runCoco = async () => {
     //  Load network
     // https://tensorflowjsrealtimemodel.s3.au-syd.cloud-object-storage.appdomain.cloud/model.json
     const net = await tf.loadGraphModel(
-      "https://tensorflowjsrealtimemodel.s3.au-syd.cloud-object-storage.appdomain.cloud/model.json"
+      'https://tensorflowjsrealtimemodel.s3.au-syd.cloud-object-storage.appdomain.cloud/model.json'
     );
 
     //  Loop and detect hands
     setInterval(() => {
       detect(net);
-    }, 16.7);
+    }, 100);
   };
 
   const detect = async (net) => {
     // Check data is available
     if (
-      typeof webcamRef.current !== "undefined" &&
+      typeof webcamRef.current !== 'undefined' &&
       webcamRef.current !== null &&
       webcamRef.current.video.readyState === 4
     ) {
@@ -46,17 +46,16 @@ function App() {
       // 4. TODO - Make Detections
       const img = tf.browser.fromPixels(video);
       const resized = tf.image.resizeBilinear(img, [640, 480]);
-      const casted = resized.cast("int32");
+      const casted = resized.cast('int32');
       const expanded = casted.expandDims(0);
       const obj = await net.executeAsync(expanded);
-      console.log(obj);
 
       const boxes = await obj[1].array();
       const classes = await obj[2].array();
       const scores = await obj[4].array();
 
       // Draw mesh
-      const ctx = canvasRef.current.getContext("2d");
+      const ctx = canvasRef.current.getContext('2d');
 
       // Update drawing utility
       // drawSomething(obj, ctx)
@@ -65,11 +64,17 @@ function App() {
           boxes[0],
           classes[0],
           scores[0],
-          0.8,
+          0.85,
           videoWidth,
           videoHeight,
           ctx
         );
+
+        const translationText = getTranslationText(classes[0], scores[0], 0.85);
+        if (translationText !== detectedWord && translationText !== undefined) {
+          console.log('detected translation', translationText);
+          setDetectedWord(translationText);
+        }
       });
 
       tf.dispose(img);
@@ -91,12 +96,10 @@ function App() {
           ref={webcamRef}
           muted={true}
           style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
+            position: 'absolute',
+            margin: '0 auto',
+            top: 100,
+            textAlign: 'center',
             zindex: 9,
             width: 640,
             height: 480,
@@ -106,17 +109,19 @@ function App() {
         <canvas
           ref={canvasRef}
           style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zindex: 8,
+            position: 'absolute',
+            margin: '0 auto',
+            top: 100,
+            textAlign: 'center',
+            zindex: 9,
             width: 640,
             height: 480,
           }}
         />
+        <h1>Sign Language Translator</h1>
+        <h2 style={{ position: 'absolute', top: 600 }}>
+          Last detected translation: {detectedWord}
+        </h2>
       </header>
     </div>
   );
